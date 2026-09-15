@@ -6,19 +6,21 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('email')->unique();
-            $table->timestamp('email_verified_at')->nullable();
+            $table->foreignId('cafe_id')->constrained('cafes')->restrictOnDelete();
+            $table->foreignId('role_id')->constrained('roles')->restrictOnDelete();
+            $table->string('name', 100);
+            $table->string('email', 100);
             $table->string('password');
-            $table->rememberToken();
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('last_login_at')->nullable();
             $table->timestamps();
+
+            // البريد فريد داخل نفس المقهى فقط
+            $table->unique(['cafe_id', 'email'], 'uq_users_cafe_email');
         });
 
         Schema::create('password_reset_tokens', function (Blueprint $table) {
@@ -37,13 +39,10 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        Schema::dropIfExists('users');
-        Schema::dropIfExists('password_reset_tokens');
         Schema::dropIfExists('sessions');
+        Schema::dropIfExists('password_reset_tokens');
+        Schema::dropIfExists('users');
     }
 };
