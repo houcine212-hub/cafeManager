@@ -70,4 +70,13 @@ class GuestAccess extends Model
     {
         return in_array($this->status, [self::STATUS_PENDING, self::STATUS_APPROVED], true);
     }
+
+    /**
+     * الوصول معتمد فعلاً من الموظف — الحالة الوحيدة المسموح بيها
+     * لإنشاء order من QR. pending/revoked/expired ممنوعين (CreateOrderAction).
+     */
+    public function isApproved(): bool
+    {
+        return $this->status === self::STATUS_APPROVED;
+    }
 }
