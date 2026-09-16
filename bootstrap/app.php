@@ -53,4 +53,38 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+        // ===================================================================
+        // ✨ جديد: أخطاء تجميد الحساب والـ Billing (Checkout Service)
+        // ===================================================================
+
+        // حالة الزيارة ما كتسمحش بالـ Checkout (مثلاً مسدودة من قبل)
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\InvalidCheckoutStateException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'error' => 'invalid_checkout_state',
+                    'message' => $e->getMessage(),
+                ], 409);
+            }
+        });
+
+        // باقي كاينين طلبات معلقة (new/accepted/preparing/ready) ما تسلماتش بعد
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\PendingOrdersExistException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'error' => 'pending_orders_exist',
+                    'message' => $e->getMessage(),
+                ], 409);
+            }
+        });
+
+        // محاولة الوصول لزيارة ديال café آخر (IDOR) — أمنية، 403 ماشي 409
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\TenantMismatchException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json([
+                    'error' => 'tenant_mismatch',
+                    'message' => $e->getMessage(),
+                ], 403);
+            }
+        });
+
     })->create();
