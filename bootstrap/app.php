@@ -87,4 +87,37 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
+                // ===================================================================
+        // ✨ جديد: أخطاء الأداء والإغلاق (PaymentService / CloseSessionService)
+        // ===================================================================
+
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\PaymentAlreadyExistsException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json(['error' => 'payment_already_exists', 'message' => $e->getMessage()], 409);
+            }
+        });
+
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\SessionNotReadyForPaymentException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json(['error' => 'session_not_ready_for_payment', 'message' => $e->getMessage()], 409);
+            }
+        });
+
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\PaymentAmountMismatchException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json(['error' => 'payment_amount_mismatch', 'message' => $e->getMessage()], 409);
+            }
+        });
+
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\IdempotencyConflictException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json(['error' => 'payment_idempotency_conflict', 'message' => $e->getMessage()], 409);
+            }
+        });
+
+        $exceptions->render(function (\App\Domain\Billing\Exceptions\PendingUnpaidSessionException $e, Request $request) {
+            if ($request->wantsJson() || $request->is('api/*')) {
+                return response()->json(['error' => 'pending_unpaid_session', 'message' => $e->getMessage()], 409);
+            }
+        });
     })->create();
