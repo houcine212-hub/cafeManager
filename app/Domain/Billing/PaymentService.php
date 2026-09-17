@@ -15,13 +15,6 @@ use Illuminate\Support\Facades\DB;
 
 class PaymentService
 {
-    /**
-     * تسجيل الأداء الفعلي لزيارة مجمّدة (بعد Checkout).
-     *
-     * D04: تسوية واحدة صالحة لكل زيارة فـ MVP. القرار هنا ما كيسدش
-     * الزيارة (closure منفصل عمداً — القسم 07: "الأداء ما كيحررش
-     * الطاولة إذا الناس مازال جالسين").
-     */
     public function recordPayment(
         TableSession $session,
         User $staff,
@@ -30,38 +23,43 @@ class PaymentService
         string $idempotencyKey,
         ?string $reference = null
     ): Payment {
-        // 0. فحص تطابق الـ Tenant قبل الدخول للـ Transaction
         if (app()->bound('current_cafe_id') && (int) app('current_cafe_id') !== (int) $session->cafe_id) {
             throw new TenantMismatchException((int) app('current_cafe_id'), (int) $session->cafe_id);
         }
 
+        if ((int) $staff->cafe_id !== (int) $session->cafe_id || ! $staff->is_active) {
+            throw new TenantMismatchException((int) $staff->cafe_id, (int) $session->cafe_id);
+        }
+
         return DB::transaction(function () use ($session, $staff, $amount, $method, $idempotencyKey, $reference) {
-            // 1. قفل الزيارة لمنع أي أداء متزامن على نفس الزيارة
             $lockedSession = TableSession::where('id', $session->id)
                 ->where('cafe_id', $session->cafe_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 2. التحقق من الـ Idempotency أولاً (retry بنفس المفتاح يرجع نفس النتيجة)
             $existingPayment = Payment::where('cafe_id', $lockedSession->cafe_id)
                 ->where('idempotency_key', $idempotencyKey)
                 ->lockForUpdate()
                 ->first();
 
             if ($existingPayment) {
-                if (! $this->matchesExistingPayload($existingPayment, $amount, $method, $reference)) {
+                if (! $this->matchesExistingPayload(
+                    $existingPayment,
+                    $lockedSession->id,
+                    $amount,
+                    $method,
+                    $reference
+                )) {
                     throw new IdempotencyConflictException();
                 }
 
                 return $existingPayment;
             }
 
-            // 3. الحالة يجب أن تكون checkout (الحساب مجمّد قبل الأداء — D02)
             if ($lockedSession->status !== TableSession::STATUS_CHECKOUT) {
                 throw new SessionNotReadyForPaymentException($lockedSession->status);
             }
 
-            // 4. فحص D04: تسوية واحدة صالحة لكل زيارة (قفل الصف باش نمنعو Race)
             $duplicatePayment = Payment::where('cafe_id', $lockedSession->cafe_id)
                 ->where('table_session_id', $lockedSession->id)
                 ->lockForUpdate()
@@ -71,7 +69,6 @@ class PaymentService
                 throw new PaymentAlreadyExistsException();
             }
 
-            // 5. المبلغ المدفوع خاصو يطابق المبلغ المجمّد بالضبط (bccomp لدقة DECIMAL)
             $expected = bcadd((string) $lockedSession->total_final, '0.00', 2);
             $received = bcadd($amount, '0.00', 2);
 
@@ -79,7 +76,6 @@ class PaymentService
                 throw new PaymentAmountMismatchException($expected, $received);
             }
 
-            // 6. إنشاء سجل الأداء
             $payment = Payment::create([
                 'cafe_id' => $lockedSession->cafe_id,
                 'table_session_id' => $lockedSession->id,
@@ -91,7 +87,6 @@ class PaymentService
                 'paid_at' => now(),
             ]);
 
-            // 7. توثيق العملية فـ audit_logs
             AuditLog::create([
                 'cafe_id' => $lockedSession->cafe_id,
                 'actor_type' => 'user',
@@ -109,12 +104,15 @@ class PaymentService
         });
     }
 
-    /**
-     * مقارنة دقيقة للـ Payload عند تكرار نفس الـ Idempotency Key
-     */
-    private function matchesExistingPayload(Payment $payment, string $amount, string $method, ?string $reference): bool
-    {
-        return bccomp((string) $payment->amount, $amount, 2) === 0
+    private function matchesExistingPayload(
+        Payment $payment,
+        int $sessionId,
+        string $amount,
+        string $method,
+        ?string $reference
+    ): bool {
+        return (int) $payment->table_session_id === $sessionId
+            && bccomp((string) $payment->amount, $amount, 2) === 0
             && $payment->method === $method
             && $payment->reference === $reference;
     }

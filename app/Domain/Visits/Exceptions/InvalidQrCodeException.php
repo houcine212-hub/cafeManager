@@ -1,32 +1,13 @@
 <?php
 
-namespace App\Domain\Ordering\Exceptions;
+namespace App\Domain\Visits\Exceptions;
 
 use RuntimeException;
-use Throwable;
 
-class InvalidOrderTransitionException extends RuntimeException
+class InvalidQrCodeException extends RuntimeException
 {
-    public function __construct(
-        private readonly string $from,
-        private readonly string $to,
-        int $code = 0,
-        ?Throwable $previous = null
-    ) {
-        parent::__construct(
-            "Transition de statut invalide : impossible de passer de [{$from}] à [{$to}].",
-            $code,
-            $previous
-        );
-    }
-
-    public function getFrom(): string
+    public function __construct(string $message = "Ce code QR est invalide ou a été révoqué.")
     {
-        return $this->from;
-    }
-
-    public function getTo(): string
-    {
-        return $this->to;
+        parent::__construct($message);
     }
 }

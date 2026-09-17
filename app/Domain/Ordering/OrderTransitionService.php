@@ -9,24 +9,19 @@ use App\Models\StockMovement;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
+use RuntimeException;
 
 class OrderTransitionService
 {
-    /**
-     * الحالات المسموح بالانتقال إليها وفق الدستور (Section 11)
-     */
     protected array $allowedTransitions = [
         'new' => ['accepted', 'cancelled'],
         'accepted' => ['preparing', 'cancelled'],
         'preparing' => ['ready', 'cancelled'],
         'ready' => ['served', 'cancelled'],
-        'served' => [],    // نهائية: مستحيل الإلغاء بعد التسليم
-        'cancelled' => [], // نهائية
+        'served' => [],
+        'cancelled' => [],
     ];
 
-    /**
-     * تنفيذ تغيير حالة الطلب وتوثيقه فـ AuditLog ومعالجة ستوك D15
-     */
     public function transition(
         Order $order,
         string $newStatus,
@@ -34,29 +29,33 @@ class OrderTransitionService
         ?string $reason = null,
         ?string $stockResolution = null
     ): Order {
-        return DB::transaction(function () use ($order, $newStatus, $actor, $reason, $stockResolution) {
-            // 1. قفل الطلب فالداتابيز
-            $lockedOrder = Order::where('id', $order->id)->lockForUpdate()->firstOrFail();
-            $currentStatus = $lockedOrder->status;
+        if ((int) $actor->cafe_id !== (int) $order->cafe_id || ! $actor->is_active) {
+            throw new RuntimeException('The actor must be an active user from the order cafe.');
+        }
 
-            // 2. التحقق الاستباقي وتفرگيع Exception المحترفة ديالنا
+        return DB::transaction(function () use ($order, $newStatus, $actor, $reason, $stockResolution) {
+            $lockedOrder = Order::where('id', $order->id)
+                ->where('cafe_id', $order->cafe_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $currentStatus = $lockedOrder->status;
             $allowed = $this->allowedTransitions[$currentStatus] ?? [];
+
             if (! in_array($newStatus, $allowed, true)) {
                 throw new InvalidOrderTransitionException($currentStatus, $newStatus);
             }
 
-            // 3. معالجة الستوك D15 إذا تم إلغاء الطلب
             if ($newStatus === 'cancelled') {
                 $this->handleCancellationStock($lockedOrder, $actor, $stockResolution);
             }
 
-            // 4. تحديث الحالة
             $beforeState = ['status' => $currentStatus];
             $lockedOrder->status = $newStatus;
             $lockedOrder->save();
 
-            // 5. توثيق العملية فـ audit_logs
             AuditLog::create([
+                'cafe_id' => $lockedOrder->cafe_id,
                 'actor_type' => 'user',
                 'actor_id' => $actor->id,
                 'action' => 'order.status_changed',
@@ -72,9 +71,6 @@ class OrderTransitionService
         });
     }
 
-    /**
-     * معالجة استرجاع أو إتلاف السلعة المعلبة (D15) عند الإلغاء
-     */
     protected function handleCancellationStock(Order $order, User $actor, ?string $stockResolution): void
     {
         $order->loadMissing('orderItems.product');
@@ -82,43 +78,62 @@ class OrderTransitionService
         foreach ($order->orderItems as $item) {
             $product = $item->product;
 
-            if ($product && $product->track_stock) {
-                if (! in_array($stockResolution, ['restock', 'waste'], true)) {
-                    throw new InvalidArgumentException(
-                        "L'annulation d'une commande contenant des articles suivis en stock exige une résolution ('restock' ou 'waste')."
-                    );
-                }
-
-                // Restock: السلعة صالحة وترجع للثلاجة
-                if ($stockResolution === 'restock') {
-                    DB::table('products')->where('id', $product->id)->increment('stock_quantity', $item->quantity);
-                    $product->refresh();
-
-                    StockMovement::create([
-                        'product_id' => $product->id,
-                        'delta' => $item->quantity, // دخول
-                        'quantity_after' => $product->stock_quantity,
-                        'reason' => 'restock',
-                        'actor_type' => 'user',
-                        'actor_id' => $actor->id,
-                        'note' => "Restock suite annulation commande #{$order->id}",
-                        'occurred_at' => now(),
-                    ]);
-                }
-                // Waste: ضاعت وتلاحت
-                elseif ($stockResolution === 'waste') {
-                    StockMovement::create([
-                        'product_id' => $product->id,
-                        'delta' => -$item->quantity, // كتبقى ضايعة فالداتابيز للكونطابيليتي
-                        'quantity_after' => $product->stock_quantity,
-                        'reason' => 'waste',
-                        'actor_type' => 'user',
-                        'actor_id' => $actor->id,
-                        'note' => "Perte (waste) suite annulation commande #{$order->id}",
-                        'occurred_at' => now(),
-                    ]);
-                }
+            if (! $product || ! $product->track_stock) {
+                continue;
             }
+
+            if (! in_array($stockResolution, ['restock', 'waste'], true)) {
+                throw new InvalidArgumentException(
+                    "L'annulation d'une commande contenant des articles suivis en stock exige une résolution ('restock' ou 'waste')."
+                );
+            }
+
+            if ($stockResolution === 'restock') {
+                DB::table('products')
+                    ->where('id', $product->id)
+                    ->where('cafe_id', $order->cafe_id)
+                    ->increment('stock_quantity', $item->quantity);
+
+                $product->refresh();
+
+                StockMovement::create([
+                    'cafe_id' => $order->cafe_id,
+                    'product_id' => $product->id,
+                    'delta' => $item->quantity,
+                    'quantity_after' => $product->stock_quantity,
+                    'reason' => 'restock',
+                    'order_item_id' => null,
+                    'actor_type' => 'user',
+                    'actor_id' => $actor->id,
+                    'note' => "Restock suite annulation commande #{$order->id}",
+                    'occurred_at' => now(),
+                ]);
+
+                continue;
+            }
+
+            // The sale movement already reduced stock when the order was created.
+            // Reclassify that movement as waste instead of recording a second decrease.
+            $saleMovement = StockMovement::where('cafe_id', $order->cafe_id)
+                ->where('product_id', $product->id)
+                ->where('order_item_id', $item->id)
+                ->where('reason', 'sale')
+                ->lockForUpdate()
+                ->first();
+
+            if (! $saleMovement) {
+                throw new RuntimeException(
+                    "Stock sale movement missing for order item #{$item->id}."
+                );
+            }
+
+            $saleMovement->update([
+                'reason' => 'waste',
+                'actor_type' => 'user',
+                'actor_id' => $actor->id,
+                'note' => "Perte (waste) suite annulation commande #{$order->id}",
+                'occurred_at' => now(),
+            ]);
         }
     }
 }

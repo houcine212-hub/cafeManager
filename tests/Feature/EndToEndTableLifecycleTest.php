@@ -42,22 +42,65 @@ class EndToEndTableLifecycleTest extends TestCase
     private Product $productTracked;
 
     protected function setUp(): void
-    {
-        parent::setUp();
+{
+    parent::setUp();
 
-        // بيانات ثابتة ومعروفة عبر الـ Seeder الرسمي ديال المشروع
-        $this->seed(DatabaseSeeder::class);
+    $this->seed(DatabaseSeeder::class);
 
-        $this->manager = User::where('email', 'manager@demo.test')->firstOrFail();
-        $this->serveur = User::where('email', 'serveur@demo.test')->firstOrFail();
-        $this->table = CafeTable::where('label', 'Table 2')->firstOrFail();
-        $this->qrCode = QrCode::where('table_id', $this->table->id)->where('is_active', true)->firstOrFail();
-        $this->productNoStock = Product::where('name', 'like', '%Café Noir%')->firstOrFail();
-        $this->productTracked = Product::where('name', 'like', '%Coca-Cola%')->firstOrFail();
+    // نجيب cafe_id مباشرة قبل أي Model عندو tenant scope
+    $cafeId = \Illuminate\Support\Facades\DB::table('cafes')
+        ->value('id');
 
-        // تعمير الـ Tenant Context — واجب قبل أي عملية (BelongsToCafe fail-closed)
-        app()->instance('current_cafe_id', $this->manager->cafe_id);
-    }
+    $this->assertNotNull($cafeId);
+
+    app()->instance(
+        'current_cafe_id',
+        (int) $cafeId
+    );
+
+    $this->manager = User::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('email', 'manager@demo.test')
+        ->firstOrFail();
+
+    $this->serveur = User::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('email', 'serveur@demo.test')
+        ->firstOrFail();
+
+    $this->table = CafeTable::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('label', 'Table 2')
+        ->firstOrFail();
+
+    $this->qrCode = QrCode::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('table_id', $this->table->id)
+        ->where('is_active', true)
+        ->firstOrFail();
+
+    $this->productNoStock = Product::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('name', 'like', '%Café Noir%')
+        ->firstOrFail();
+
+    $this->productTracked = Product::where(
+        'cafe_id',
+        $cafeId
+    )
+        ->where('name', 'like', '%Coca-Cola%')
+        ->firstOrFail();
+}
 
     public function test_full_table_lifecycle_from_open_to_close(): void
     {

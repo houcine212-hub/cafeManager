@@ -30,7 +30,6 @@ class CreateOrderAction
         ?int $userId = null,
         ?string $notes = null
     ): Order {
-        // 1. فحص تطابق سياق الـ Tenant فالبداية لمنع أي خلط صامت
         if (app()->bound('current_cafe_id') && (int) app('current_cafe_id') !== $cafeId) {
             throw new RuntimeException(sprintf(
                 'Tenant mismatch: Action cafeId (%d) does not match active context (%d).',
@@ -39,16 +38,19 @@ class CreateOrderAction
             ));
         }
 
-        // 2. فحص هوية الفاعل وفق الدستور (Section 13)
         $this->validateActor($source, $guestAccessId, $userId);
-
-        // 3. فحص صارم للكميات لمنع القيم السالبة وتضخيم الستوك
         $this->validateItemsPayload($items);
 
         return DB::transaction(function () use (
-            $cafeId, $sessionId, $items, $idempotencyKey, $source, $guestAccessId, $userId, $notes
+            $cafeId,
+            $sessionId,
+            $items,
+            $idempotencyKey,
+            $source,
+            $guestAccessId,
+            $userId,
+            $notes
         ) {
-            // 4. قفل الجلسة أولاً والتأكد من أنها مفتوحة (Status = OPEN)
             $session = TableSession::where('id', $sessionId)
                 ->where('cafe_id', $cafeId)
                 ->lockForUpdate()
@@ -58,26 +60,27 @@ class CreateOrderAction
                 throw new SessionNotAcceptingOrdersException($session->status);
             }
 
-            // 5. التحقق من الـ Idempotency أولاً (Section 08 & 14)
-            // مهم: retry بنفس المحتوى يجب أن يرجع نفس النتيجة بلا أي شرط إضافي
-            // (بما فيه حالة guest_access)، حتى لو تغيّرت صلاحية الزبون بعد
-            // التثبيت الأصلي. لهذا هاد الفحص قبل فحص guest_access.
             $existingOrder = Order::where('cafe_id', $cafeId)
                 ->where('idempotency_key', $idempotencyKey)
                 ->lockForUpdate()
                 ->first();
 
             if ($existingOrder) {
-                if (! $this->matchesExistingPayload($existingOrder, $items)) {
+                if (! $this->matchesExistingPayload(
+                    $existingOrder,
+                    $sessionId,
+                    $items,
+                    $source,
+                    $guestAccessId,
+                    $userId,
+                    $notes
+                )) {
                     throw new IdempotencyConflictException();
                 }
 
                 return $existingOrder->load('orderItems');
             }
 
-            // 6. إذا كان الطلب من QR (إنشاء جديد)، نتحقق أن تصريح الزبون
-            // نشط ومعتمد (Approved) لنفس الجلسة. القفل هنا لتفادي تغيّر
-            // الحالة (revoke) بين الفحص والاستعمال داخل نفس الـ transaction.
             if ($source === 'qr') {
                 $guestAccess = GuestAccess::where('id', $guestAccessId)
                     ->where('cafe_id', $cafeId)
@@ -90,11 +93,9 @@ class CreateOrderAction
                 }
             }
 
-            // 7. ترتيب المنتجات تصاعدياً حسب id لمنع الـ Deadlock (Test T21)
             $itemCollection = collect($items)->sortBy('product_id')->values();
             $productIds = $itemCollection->pluck('product_id')->unique()->toArray();
 
-            // قفل المنتجات المطلوبة وإعادة قراءة الثمن والتوفر الحقيقي من الداتابيز
             $products = Product::whereIn('id', $productIds)
                 ->where('cafe_id', $cafeId)
                 ->where('is_active', true)
@@ -102,10 +103,8 @@ class CreateOrderAction
                 ->get()
                 ->keyBy('id');
 
-            // 8. فحص توفر جميع المنتجات
             foreach ($itemCollection as $line) {
                 $productId = $line['product_id'];
-                /** @var Product|null $product */
                 $product = $products->get($productId);
 
                 if (! $product || ! $product->is_available) {
@@ -114,7 +113,6 @@ class CreateOrderAction
                 }
             }
 
-            // 9. إنشاء صف الطلب (Order)
             $order = Order::create([
                 'cafe_id' => $cafeId,
                 'table_session_id' => $sessionId,
@@ -126,14 +124,11 @@ class CreateOrderAction
                 'notes' => $notes,
             ]);
 
-            // 10. معالجة أسطر الطلب ونقصان الستوك الذري D15
             foreach ($itemCollection as $line) {
                 $productId = $line['product_id'];
                 $quantity = (int) $line['quantity'];
-                /** @var Product $product */
                 $product = $products->get($productId);
 
-                // أ. النقصان الذري للمنتجات المتتبعة بالستوك D15
                 if ($product->track_stock) {
                     $affected = DB::table('products')
                         ->where('id', $productId)
@@ -149,7 +144,6 @@ class CreateOrderAction
                     $product->stock_quantity -= $quantity;
                 }
 
-                // ب. حساب line_total باستعمال bcmul بدقة DECIMAL (بلا Float)
                 $lineTotal = bcmul((string) $product->price, (string) $quantity, 2);
 
                 $orderItem = OrderItem::create([
@@ -163,7 +157,6 @@ class CreateOrderAction
                     'note' => $line['note'] ?? null,
                 ]);
 
-                // ج. تسجيل حركة البيع فـ stock_movements (D15)
                 if ($product->track_stock) {
                     StockMovement::create([
                         'cafe_id' => $cafeId,
@@ -180,7 +173,6 @@ class CreateOrderAction
                 }
             }
 
-            // 11. توثيق العملية فـ audit_logs مع تحديد هوية الفاعل بدقة
             AuditLog::create([
                 'cafe_id' => $cafeId,
                 'actor_type' => $source === 'staff' ? 'user' : 'guest',
@@ -198,9 +190,6 @@ class CreateOrderAction
         });
     }
 
-    /**
-     * فحص مدخلات السلعة والكميات (منع القيم السالبة والصفرية)
-     */
     private function validateItemsPayload(array $items): void
     {
         if (empty($items)) {
@@ -219,9 +208,6 @@ class CreateOrderAction
         }
     }
 
-    /**
-     * التحقق من فاعل الطلب وفق الدستور (Section 13)
-     */
     private function validateActor(string $source, ?int $guestAccessId, ?int $userId): void
     {
         if ($source === 'qr' && (empty($guestAccessId) || ! empty($userId))) {
@@ -231,24 +217,49 @@ class CreateOrderAction
         if ($source === 'staff' && (empty($userId) || ! empty($guestAccessId))) {
             throw new InvalidArgumentException("Une commande STAFF doit avoir un user_id et aucun guest_access_id.");
         }
+
+        if (! in_array($source, ['qr', 'staff'], true)) {
+            throw new InvalidArgumentException("La source de la commande doit être 'qr' ou 'staff'.");
+        }
     }
 
-    /**
-     * مقارنة دقيقة للـ Payload عند تكرار نفس الـ Idempotency Key
-     */
-    private function matchesExistingPayload(Order $order, array $newItems): bool
-    {
+    private function matchesExistingPayload(
+        Order $order,
+        int $sessionId,
+        array $newItems,
+        string $source,
+        ?int $guestAccessId,
+        ?int $userId,
+        ?string $notes
+    ): bool {
+        if ((int) $order->table_session_id !== $sessionId
+            || $order->source !== $source
+            || ($order->guest_access_id === null ? null : (int) $order->guest_access_id) !== $guestAccessId
+            || ($order->created_by_user_id === null ? null : (int) $order->created_by_user_id) !== $userId
+            || $order->notes !== $notes
+        ) {
+            return false;
+        }
+
         $existing = $order->orderItems()
-            ->get(['product_id', 'quantity'])
+            ->get(['product_id', 'quantity', 'note'])
             ->sortBy('product_id')
             ->values()
-            ->map(fn ($i) => ['product_id' => (int) $i->product_id, 'quantity' => (int) $i->quantity])
+            ->map(fn ($item) => [
+                'product_id' => (int) $item->product_id,
+                'quantity' => (int) $item->quantity,
+                'note' => $item->note,
+            ])
             ->toArray();
 
         $incoming = collect($newItems)
             ->sortBy('product_id')
             ->values()
-            ->map(fn ($i) => ['product_id' => (int) $i['product_id'], 'quantity' => (int) $i['quantity']])
+            ->map(fn ($item) => [
+                'product_id' => (int) $item['product_id'],
+                'quantity' => (int) $item['quantity'],
+                'note' => $item['note'] ?? null,
+            ])
             ->toArray();
 
         return $existing === $incoming;
