@@ -6,6 +6,7 @@ use App\Domain\Billing\Exceptions\InvalidCheckoutStateException;
 use App\Domain\Billing\Exceptions\PendingUnpaidSessionException;
 use App\Domain\Billing\Exceptions\TenantMismatchException;
 use App\Models\AuditLog;
+use App\Models\GuestAccess;
 use App\Models\Payment;
 use App\Models\TableSession;
 use App\Models\User;
@@ -15,14 +16,7 @@ use InvalidArgumentException;
 class CloseSessionService
 {
     /**
-     * إغلاق الزيارة النهائي وتحرير الطاولة.
-     *
-     * القسم 07: "الأداء ما كيحررش الطاولة إذا الناس مازال جالسين" —
-     * الإغلاق فعل منفصل وواعي ديال الموظف، ماشي نتيجة تلقائية للأداء.
-     *
-     * حالتين مسموحتين فقط:
-     * 1. paid: كاين Payment صالح لهاد الزيارة.
-     * 2. exception_unpaid: Manager فقط، بسبب موثق، بلا أداء وهمي.
+     * Close the visit and release the table.
      */
     public function close(
         TableSession $session,
@@ -34,19 +28,15 @@ class CloseSessionService
         }
 
         return DB::transaction(function () use ($session, $staff, $unpaidReason) {
-            // 1. قفل الزيارة
             $lockedSession = TableSession::where('id', $session->id)
                 ->where('cafe_id', $session->cafe_id)
                 ->lockForUpdate()
                 ->firstOrFail();
 
-            // 2. الحالة يجب أن تكون checkout (الحساب مجمّد أولاً — ما كاينش
-            // إغلاق مباشر من open بلا تجميد وحساب المجموع)
             if ($lockedSession->status !== TableSession::STATUS_CHECKOUT) {
                 throw new InvalidCheckoutStateException($lockedSession->status);
             }
 
-            // 3. فحص وجود Payment صالح لهاد الزيارة
             $payment = Payment::where('cafe_id', $lockedSession->cafe_id)
                 ->where('table_session_id', $lockedSession->id)
                 ->first();
@@ -54,7 +44,6 @@ class CloseSessionService
             $closureReason = TableSession::CLOSURE_PAID;
 
             if (! $payment) {
-                // 4. بلا Payment: خاص استثناء manager صريح وموثق (القسم 08)
                 if (! $staff->isManager()) {
                     throw new PendingUnpaidSessionException();
                 }
@@ -68,7 +57,6 @@ class CloseSessionService
                 $closureReason = TableSession::CLOSURE_EXCEPTION_UNPAID;
             }
 
-            // 5. تحديث وإغلاق الزيارة
             $beforeState = $lockedSession->only(['status', 'closed_at', 'closed_by', 'closure_reason']);
 
             $lockedSession->update([
@@ -78,15 +66,17 @@ class CloseSessionService
                 'closure_reason' => $closureReason,
             ]);
 
-            // (BUG FIX: active_table_marker هو عمود GENERATED STORED فـ MySQL
-            // (كيتحسب تلقائياً من status). Eloquent ما كيعاودش يقرا القيمة
-            // المحسوبة من الداتابيز من بعد update() — الـ object فالـ memory
-            // كيبقى فيه القيمة القديمة (stale). لازم refresh() صريح باش
-            // نرجعو نجيبو القيمة الحقيقية (NULL هنا) قبل ما نرجعو الـ object
-            // للمتصل، وإلا أي كود كيتأكد من تحرر الطاولة غادي يتفشل بغلط.)
+            // Closing a visit invalidates every device access for that visit.
+            GuestAccess::where('table_session_id', $lockedSession->id)
+                ->whereIn('status', [GuestAccess::STATUS_PENDING, GuestAccess::STATUS_APPROVED])
+                ->update([
+                    'status' => GuestAccess::STATUS_REVOKED,
+                    'revoked_at' => now(),
+                ]);
+
+            // Refresh generated columns before returning the session instance.
             $lockedSession->refresh();
 
-            // 6. توثيق العملية فـ audit_logs
             AuditLog::create([
                 'cafe_id' => $lockedSession->cafe_id,
                 'actor_type' => 'user',
