@@ -4,16 +4,15 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Menu / القائمة') · Café Al Nour</title>
+    <title>@yield('title', 'Menu / القائمة')</title>
     @vite(['resources/css/tokens.css', 'resources/css/base.css'])
     @stack('styles')
 </head>
 <body data-surface="guest">
     <div class="page-shell">
         <header class="split" style="margin-bottom:var(--space-5)">
-            <a href="{{ url()->current() }}" aria-label="Café Al Nour">
-                <strong>Café Al Nour</strong>
-                <span class="muted">Bon café · Bonne ambiance</span>
+            <a href="{{ url()->current() }}" >
+                <span class="muted">Bon time · Bonne ambiance</span>
             </a>
             <div class="cluster">
                 <span class="status" data-status="active">@yield('table_context', 'Table / الطاولة')</span>

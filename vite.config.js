@@ -8,6 +8,7 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/tokens.css',
                 'resources/css/base.css',
+                'resources/css/guest.css',
                 'resources/js/app.js',
                 'resources/js/core/i18n.js',
                 'resources/js/main-guest.js',

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Guest\GuestOrderController;
+use App\Http\Controllers\Guest\GuestPageController;
 use App\Http\Controllers\Staff\OrderController;
 use App\Http\Controllers\Staff\PaymentController;
 use App\Http\Controllers\Staff\TableSessionController;
@@ -12,6 +13,24 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+/*
+|--------------------------------------------------------------------------
+| Guest page
+|--------------------------------------------------------------------------
+| هادي كتفتح الواجهة HTML.
+| /q/{token}/menu كيبقى JSON API.
+*/
+Route::get('/q/{token}', [GuestPageController::class, 'show'])
+    ->middleware([
+        ResolveTenantFromQrToken::class,
+        ResolveGuestAccessFromCookie::class,
+    ]);
+
+/*
+|--------------------------------------------------------------------------
+| Guest JSON API
+|--------------------------------------------------------------------------
+*/
 Route::prefix('q/{token}')
     ->middleware([
         ResolveTenantFromQrToken::class,
@@ -49,6 +68,11 @@ Route::prefix('q/{token}')
         );
     });
 
+/*
+|--------------------------------------------------------------------------
+| Staff API
+|--------------------------------------------------------------------------
+*/
 Route::prefix('staff')
     ->middleware([
         'auth',
