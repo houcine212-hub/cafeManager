@@ -5,6 +5,8 @@ use App\Http\Controllers\Guest\GuestPageController;
 use App\Http\Controllers\Staff\OrderController;
 use App\Http\Controllers\Staff\PaymentController;
 use App\Http\Controllers\Staff\TableSessionController;
+use App\Http\Controllers\Staff\GuestAccessController;
+use App\Http\Controllers\Staff\StaffPageController;
 use App\Http\Middleware\ResolveGuestAccessFromCookie;
 use App\Http\Middleware\ResolveTenantFromQrToken;
 use Illuminate\Support\Facades\Route;
@@ -79,6 +81,23 @@ Route::prefix('staff')
         'tenant',
     ])
     ->group(function () {
+        Route::get('/', [StaffPageController::class, 'show']);
+
+        Route::get(
+            '/guest-accesses',
+            [GuestAccessController::class, 'index']
+        );
+
+        Route::post(
+            '/guest-accesses/{guestAccessId}/approve',
+            [GuestAccessController::class, 'approve']
+        );
+
+        Route::post(
+            '/guest-accesses/{guestAccessId}/revoke',
+            [GuestAccessController::class, 'revoke']
+        );
+
         Route::post(
             '/tables/{tableId}/open',
             [TableSessionController::class, 'open']
