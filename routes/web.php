@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Guest\GuestOrderController;
 use App\Http\Controllers\Guest\GuestPageController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Staff\OrderController;
 use App\Http\Controllers\Staff\PaymentController;
 use App\Http\Controllers\Staff\TableSessionController;
@@ -14,6 +15,15 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::middleware('guest')->group(function () {
+    Route::get('/login', [LoginController::class, 'create'])->name('login');
+    Route::post('/login', [LoginController::class, 'store']);
+});
+
+Route::post('/logout', [LoginController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
 
 /*
 |--------------------------------------------------------------------------
@@ -81,7 +91,10 @@ Route::prefix('staff')
         'tenant',
     ])
     ->group(function () {
-        Route::get('/', [StaffPageController::class, 'show']);
+        Route::get('/', [StaffPageController::class, 'show'])->name('staff.dashboard');
+        Route::get('/orders', [StaffPageController::class, 'orders'])->name('staff.orders');
+        Route::get('/tables', [StaffPageController::class, 'tables'])->name('staff.tables');
+        Route::get('/payments', [StaffPageController::class, 'payments'])->name('staff.payments');
 
         Route::get(
             '/guest-accesses',

@@ -200,12 +200,17 @@ class StaffEndpointsTest extends TestCase
                         'id',
                         'status',
                         'order_items',
+                        'table_session',
                     ],
                 ],
             ])
             ->assertJsonPath(
                 'orders.0.id',
                 $order->id
+            )
+            ->assertJsonPath(
+                'orders.0.table_session.table.id',
+                $this->table->id
             );
     }
 

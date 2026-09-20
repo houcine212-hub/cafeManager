@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Respect HTTPS forwarded by ngrok/reverse proxies.
+        $middleware->trustProxies(at: '*');
+
         // تسجيل الـ Middlewares ديال تحديد المقهى (Tenant) والوصول
         $middleware->alias([
             // للموظفين (staff/manager) المسجلين بـ auth
@@ -38,12 +41,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-
         // ===================================================================
         // أخطاء الـ Ordering (Domain\Ordering\Exceptions)
         // ===================================================================
 
-        // التقاط الـ Exception ديال الانتقالات وإرجاع 409 Conflict مع الداتا
         $exceptions->render(function (\App\Domain\Ordering\Exceptions\InvalidOrderTransitionException $e, Request $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -55,7 +56,6 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // التقاط تضارب الـ Idempotency (مكرر بـ محتوى مختلف)
         $exceptions->render(function (\App\Domain\Ordering\Exceptions\IdempotencyConflictException $e, Request $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -65,7 +65,6 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // التقاط حالة الستوك D15 نفد
         $exceptions->render(function (\App\Domain\Ordering\Exceptions\ProductOutOfStockException $e, Request $request) {
             if ($request->wantsJson() || $request->is('api/*')) {
                 return response()->json([
@@ -103,7 +102,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // ===================================================================
-        // أخطاء الـ Visits (Domain\Visits\Exceptions) — D09 القرار
+        // أخطاء الـ Visits
         // ===================================================================
 
         $exceptions->render(function (\App\Domain\Visits\Exceptions\InvalidQrCodeException $e, Request $request) {
@@ -134,7 +133,7 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         // ===================================================================
-        // أخطاء تجميد الحساب والـ Billing (Checkout / Payment / Close)
+        // أخطاء Billing
         // ===================================================================
 
         $exceptions->render(function (\App\Domain\Billing\Exceptions\InvalidCheckoutStateException $e, Request $request) {
@@ -208,5 +207,4 @@ return Application::configure(basePath: dirname(__DIR__))
                 ], 409);
             }
         });
-
     })->create();

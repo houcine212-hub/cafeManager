@@ -20,6 +20,20 @@ class TableSessionController extends Controller
             ->where('is_active', true)
             ->findOrFail($tableId);
 
+        $existing = TableSession::query()
+            ->where('cafe_id', $table->cafe_id)
+            ->where('table_id', $table->id)
+            ->where('status', TableSession::STATUS_OPEN)
+            ->first();
+
+        if ($existing) {
+            return response()->json([
+                'error' => 'table_occupied',
+                'message' => 'Cette table est déjà occupée.',
+                'session' => $existing,
+            ], 409);
+        }
+
         $session = TableSession::create([
             'cafe_id' => $table->cafe_id,
             'table_id' => $table->id,

@@ -1,3 +1,7 @@
+function currentLocale() {
+    return document.documentElement.lang?.startsWith('ar') ? 'ar' : 'fr';
+}
+
 export function watchConnectivity({ onOnline, onOffline } = {}) {
     const online = () => onOnline?.();
     const offline = () => onOffline?.();
@@ -11,25 +15,19 @@ export function watchConnectivity({ onOnline, onOffline } = {}) {
     };
 }
 
-export function lastUpdatedLabel(timestamp, now = Date.now()) {
-    const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
-
-    if (seconds < 8) return 'Mis à jour maintenant / محيّن الآن';
-    if (seconds < 60) return `Mis à jour il y a ${seconds}s / منذ ${seconds} ثواني`;
-
-    return `Mis à jour il y a ${Math.floor(seconds / 60)}min / منذ ${Math.floor(seconds / 60)} دقيقة`;
-}
-
 export function bindConnectionIndicator(element) {
     if (!element) return () => {};
 
+    const label = element.querySelector('[data-connection-label]') ?? element;
+
     const update = () => {
         const online = navigator.onLine;
+        const locale = currentLocale();
 
         element.dataset.online = String(online);
-        element.textContent = online
-            ? 'Connecté / متصل'
-            : 'Hors connexion / غير متصل';
+        label.textContent = online
+            ? (locale === 'ar' ? 'متصل' : 'Connecté')
+            : (locale === 'ar' ? 'غير متصل' : 'Hors connexion');
     };
 
     const cleanup = watchConnectivity({
@@ -40,4 +38,26 @@ export function bindConnectionIndicator(element) {
     update();
 
     return cleanup;
+}
+
+/**
+ * Renders a live HH:MM clock into `element`, formatted for the current
+ * document locale. Returns a cleanup function.
+ */
+export function bindClock(element) {
+    if (!element) return () => {};
+
+    const update = () => {
+        const locale = currentLocale();
+        const formatter = new Intl.DateTimeFormat(locale === 'ar' ? 'ar' : 'fr-FR', {
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+        element.textContent = formatter.format(new Date());
+    };
+
+    update();
+    const timer = window.setInterval(update, 30000);
+
+    return () => window.clearInterval(timer);
 }

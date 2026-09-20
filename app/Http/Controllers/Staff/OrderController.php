@@ -25,6 +25,7 @@ class OrderController extends Controller
         $query = Order::query()
             ->with([
                 'orderItems.product',
+                'tableSession.table',
             ])
             ->latest('id');
 

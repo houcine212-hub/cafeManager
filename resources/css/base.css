@@ -4,6 +4,12 @@
     box-sizing: border-box;
 }
 
+/* Guarantees anything toggled with the native `hidden` attribute actually
+   disappears, even when its class also sets `display` (grid/flex/etc). */
+[hidden] {
+    display: none !important;
+}
+
 html {
     min-width: 320px;
     background: var(--color-ivory);
@@ -191,6 +197,16 @@ p {
 
 .button--quiet {
     background: transparent;
+}
+
+.staff-sidebar .button--quiet {
+    border-color: rgb(255 255 255 / 0.4);
+    color: #fff;
+}
+
+.staff-sidebar .button--quiet:hover,
+.staff-sidebar .button--quiet:focus-visible {
+    background: rgb(255 255 255 / 0.12);
 }
 
 .field {

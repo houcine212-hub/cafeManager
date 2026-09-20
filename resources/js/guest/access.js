@@ -1,13 +1,42 @@
 import { apiFetch, ConflictError } from '../core/http.js';
 import { createPoller } from '../core/polling.js';
 
-const messages = {
-    pending: 'En attente de l’approbation du personnel / في انتظار موافقة الموظفين',
-    approved: 'Accès approuvé / تمت الموافقة على الدخول',
-    revoked: 'Accès révoqué / تم إلغاء الدخول',
-    expired: 'Session expirée / انتهت الجلسة',
-    not_found: 'Aucun accès actif pour cet appareil / لا يوجد دخول نشط لهذا الجهاز',
-    conflict: 'Une demande est déjà en traitement / يوجد طلب آخر قيد المعالجة',
+function locale() {
+    return document.documentElement.lang?.startsWith('ar') ? 'ar' : 'fr';
+}
+
+const MESSAGES = {
+    fr: {
+        pending: 'En attente de l’approbation du personnel',
+        approved: 'Accès approuvé',
+        revoked: 'Accès révoqué',
+        expired: 'Session expirée',
+        not_found: 'Aucun accès actif pour cet appareil',
+        conflict: 'La demande ne peut pas être traitée maintenant',
+        unknown: 'État inconnu',
+    },
+    ar: {
+        pending: 'في انتظار موافقة الموظفين',
+        approved: 'تمت الموافقة على الدخول',
+        revoked: 'تم إلغاء الدخول',
+        expired: 'انتهت الجلسة',
+        not_found: 'لا يوجد دخول نشط لهذا الجهاز',
+        conflict: 'لا يمكن معالجة الطلب حالياً',
+        unknown: 'حالة غير معروفة',
+    },
+};
+
+const CONFLICT_MESSAGES = {
+    fr: {
+        InvalidQrCodeException: 'QR code invalide',
+        NoActiveSessionException: 'Aucune session active pour cette table',
+        ActiveSessionAlreadyHasAccessException: 'Cette table a déjà un accès actif',
+    },
+    ar: {
+        InvalidQrCodeException: 'رمز QR غير صالح',
+        NoActiveSessionException: 'لا توجد جلسة مفتوحة لهذه الطاولة',
+        ActiveSessionAlreadyHasAccessException: 'هذه الطاولة لديها دخول نشط بالفعل',
+    },
 };
 
 export function initGuestAccess(basePath, { onState, onMessage } = {}) {
@@ -20,80 +49,50 @@ export function initGuestAccess(basePath, { onState, onMessage } = {}) {
 
     const applyState = status => {
         onState?.(status);
-        onMessage?.(
-            messages[status] ?? 'État inconnu / حالة غير معروفة',
-        );
-
-        if (['approved', 'revoked', 'expired', 'not_found'].includes(status)) {
-            stop();
-        }
+        onMessage?.(MESSAGES[locale()][status] ?? MESSAGES[locale()].unknown);
+        if (['approved', 'revoked', 'expired', 'not_found'].includes(status)) stop();
     };
 
     const readStatus = async () => {
         try {
             const data = await apiFetch(`${basePath}/access-status`);
-
             applyState(data.status);
-
             return data;
         } catch (error) {
             if (error.status === 404) {
                 applyState('not_found');
                 return null;
             }
-
-            onMessage?.(
-                'Impossible de vérifier l’accès / تعذر التحقق من الدخول',
-            );
-
+            onMessage?.(locale() === 'ar' ? 'تعذر التحقق من الدخول' : 'Impossible de vérifier l’accès');
             throw error;
         }
     };
 
     const startPolling = () => {
         stop();
-
-        poller = createPoller(readStatus, {
-            intervalMs: 3000,
-            maxIntervalMs: 15000,
-        });
+        poller = createPoller(readStatus, { intervalMs: 3000, maxIntervalMs: 15000 });
     };
 
     const requestAccess = async () => {
         try {
-            const data = await apiFetch(`${basePath}/access-requests`, {
-                method: 'POST',
-            });
-
+            const data = await apiFetch(`${basePath}/access-requests`, { method: 'POST' });
             applyState(data.status ?? 'pending');
             startPolling();
-
             return data;
         } catch (error) {
             if (error instanceof ConflictError) {
                 applyState('conflict');
+                onMessage?.(CONFLICT_MESSAGES[locale()][error.data?.error] ?? error.message ?? MESSAGES[locale()].conflict);
                 return null;
             }
-
-            onMessage?.(
-                'La demande n’a pas pu être envoyée / تعذر إرسال الطلب',
-            );
-
+            onMessage?.(locale() === 'ar' ? 'تعذر إرسال الطلب' : 'La demande n’a pas pu être envoyée');
             throw error;
         }
     };
 
-    readStatus()
-        .then(data => {
-            if (data?.status === 'pending') {
-                startPolling();
-            }
-        })
-        .catch(() => {});
+    readStatus().then(data => {
+        if (data?.status === 'pending') startPolling();
+    }).catch(() => {});
 
-    return {
-        requestAccess,
-        refresh: readStatus,
-        stop,
-    };
+    return { requestAccess, refresh: readStatus, stop };
 }
