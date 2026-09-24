@@ -870,3 +870,47 @@
         font-size: 0.52rem;
     }
 }
+
+
+.guest-service {
+    display: grid;
+    gap: var(--space-3);
+    padding: var(--space-4);
+}
+
+.guest-service__eyebrow {
+    margin-bottom: var(--space-1);
+    color: var(--color-muted);
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.guest-service__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.guest-service__actions .button {
+    flex: 1 1 15rem;
+}
+
+[data-service-request-result][data-kind="error"] {
+    border-color: #e2aa9a;
+    background: #fff1ec;
+    color: var(--color-danger);
+}
+
+[data-service-request-result][data-kind="success"] {
+    border-color: #a9d0af;
+    background: #eff8ed;
+    color: var(--color-success);
+}
+
+@media (max-width: 370px) {
+    .guest-service__actions {
+        display: grid;
+    }
+}

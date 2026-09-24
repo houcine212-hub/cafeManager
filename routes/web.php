@@ -5,6 +5,7 @@ use App\Http\Controllers\Guest\GuestPageController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Staff\OrderController;
 use App\Http\Controllers\Staff\PaymentController;
+use App\Http\Controllers\Staff\ServiceRequestController;
 use App\Http\Controllers\Staff\TableSessionController;
 use App\Http\Controllers\Staff\GuestAccessController;
 use App\Http\Controllers\Staff\StaffPageController;
@@ -93,6 +94,7 @@ Route::prefix('staff')
     ->group(function () {
         Route::get('/', [StaffPageController::class, 'show'])->name('staff.dashboard');
         Route::get('/orders', [StaffPageController::class, 'orders'])->name('staff.orders');
+        Route::get('/service-requests', [StaffPageController::class, 'serviceRequests'])->name('staff.service-requests');
         Route::get('/tables', [StaffPageController::class, 'tables'])->name('staff.tables');
         Route::get('/payments', [StaffPageController::class, 'payments'])->name('staff.payments');
 
@@ -129,6 +131,16 @@ Route::prefix('staff')
         Route::get(
             '/orders/updates',
             [OrderController::class, 'index']
+        );
+
+        Route::get(
+            '/service-requests/updates',
+            [ServiceRequestController::class, 'index']
+        );
+
+        Route::patch(
+            '/service-requests/{serviceRequestId}/status',
+            [ServiceRequestController::class, 'update']
         );
 
         Route::post(

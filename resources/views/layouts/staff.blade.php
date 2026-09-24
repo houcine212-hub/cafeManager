@@ -4,44 +4,115 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', app()->getLocale() === 'ar' ? 'الموظفون' : 'Espace staff')</title>
+    <title>@yield('title', 'Staff / الموظفون') · Café Al Nour</title>
+
     @vite(['resources/css/tokens.css', 'resources/css/base.css'])
     @stack('styles')
 </head>
+
 <body data-surface="staff">
     <div class="staff-shell">
-        <aside class="staff-sidebar" aria-label="{{ app()->getLocale() === 'ar' ? 'تنقل الموظفين' : 'Navigation du personnel' }}">
-            <div class="staff-brand">
-                <span class="staff-brand__mark" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M4 10h13a3 3 0 0 1 0 6h-1M4 10v7a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1v-1M4 10V7a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v3"/>
-                    </svg>
+        <aside class="staff-sidebar" aria-label="Staff navigation / تنقل الموظفين">
+            <a href="{{ route('staff.dashboard') }}" class="brand-link">
+                <span class="brand-mark" aria-hidden="true">✦</span>
+
+                <span>
+                    <strong>Café Al Nour</strong>
+                    <small>Bon café · Bonne ambiance</small>
                 </span>
-                <span class="staff-brand__name">{{ config('app.name', app()->getLocale() === 'ar' ? 'واجهة الموظفين' : 'Espace staff') }}</span>
-            </div>
+            </a>
 
             <nav class="staff-nav" aria-label="Navigation">
-                @yield('navigation')
+                <a
+                    class="{{ request()->routeIs('staff.dashboard') ? 'is-active' : '' }}"
+                    href="{{ route('staff.dashboard') }}"
+                >
+                    <span class="nav-icon" aria-hidden="true">⌂</span>
+
+                    <span>
+                        Tableau de bord
+                        <small>لوحة التحكم</small>
+                    </span>
+                </a>
+
+                <a
+                    class="{{ request()->routeIs('staff.orders') ? 'is-active' : '' }}"
+                    href="{{ route('staff.orders') }}"
+                >
+                    <span class="nav-icon" aria-hidden="true">▣</span>
+
+                    <span>
+                        File des commandes
+                        <small>قائمة الطلبات</small>
+                    </span>
+                </a>
+
+                <a
+                    class="{{ request()->routeIs('staff.service-requests') ? 'is-active' : '' }}"
+                    href="{{ route('staff.service-requests') }}"
+                >
+                    <span class="nav-icon" aria-hidden="true">♢</span>
+
+                    <span>
+                        Demandes de service
+                        <small>طلبات الخدمة</small>
+                    </span>
+                </a>
+
+                <a
+                    class="{{ request()->routeIs('staff.tables') ? 'is-active' : '' }}"
+                    href="{{ route('staff.tables') }}"
+                >
+                    <span class="nav-icon" aria-hidden="true">▤</span>
+
+                    <span>
+                        Détails de la table
+                        <small>تفاصيل الطاولة</small>
+                    </span>
+                </a>
+
+                <a
+                    class="{{ request()->routeIs('staff.payments') ? 'is-active' : '' }}"
+                    href="{{ route('staff.payments') }}"
+                >
+                    <span class="nav-icon" aria-hidden="true">▥</span>
+
+                    <span>
+                        Encaissement
+                        <small>الأداء</small>
+                    </span>
+                </a>
             </nav>
 
             <div class="staff-sidebar__footer">
-                <span class="status-pill" data-connection-indicator>
-                    <svg viewBox="0 0 8 8" class="status-dot" aria-hidden="true"><circle cx="4" cy="4" r="4"/></svg>
-                    <span data-connection-label>{{ app()->getLocale() === 'ar' ? 'جارٍ التحقق' : 'Vérification…' }}</span>
+                <span class="staff-open-state">
+                    <i></i>
+                    Ouvert
+                    <small>مفتوح</small>
                 </span>
 
-                <div class="staff-account">
-                    <span class="staff-account__avatar" aria-hidden="true">{{ mb_strtoupper(mb_substr($role ?? 'S', 0, 1)) }}</span>
-                    <span class="staff-account__role">{{ ucfirst($role ?? ($request->user()->role?->name ?? 'staff')) }}</span>
-                </div>
+                <span class="staff-clock">
+                    {{ now()->format('H:i') }}
+                    <small>{{ now()->format('D d M') }}</small>
+                </span>
 
-                <form method="POST" action="{{ route('logout') }}" class="staff-logout-form">
+                <span
+                    class="connection-indicator"
+                    data-connection-indicator
+                >
+                    Checking connection / جار التحقق
+                </span>
+
+                <span class="staff-role">
+                    {{ ucfirst($role ?? 'staff') }}
+                    <small>الموظفون</small>
+                </span>
+
+                <form method="POST" action="{{ route('logout') }}">
                     @csrf
-                    <button class="icon-button icon-button--ghost" type="submit" title="{{ app()->getLocale() === 'ar' ? 'خروج' : 'Déconnexion' }}">
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M8 17H4.8A1.8 1.8 0 0 1 3 15.2V4.8A1.8 1.8 0 0 1 4.8 3H8"/>
-                            <path d="M13 14l4-4-4-4M17 10H7.5"/>
-                        </svg>
+
+                    <button class="button button--quiet" type="submit">
+                        Logout / خروج
                     </button>
                 </form>
             </div>
@@ -50,30 +121,40 @@
         <main class="staff-main">
             <header class="staff-topbar">
                 <div>
-                    <h1>@yield('page_heading', app()->getLocale() === 'ar' ? 'الموظفون' : 'Espace staff')</h1>
+                    <p class="staff-breadcrumb">Café Al Nour</p>
+                    <h1>@yield('page_heading', 'Staff / الموظفون')</h1>
                 </div>
-                <div class="staff-topbar__tools">
-                    <span class="staff-clock" data-clock aria-hidden="true"></span>
 
-                    <label class="lang-select">
-                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
-                            <circle cx="10" cy="10" r="7.5"/>
-                            <path d="M2.5 10h15M10 2.5c2 2.2 3 4.8 3 7.5s-1 5.3-3 7.5c-2-2.2-3-4.8-3-7.5s1-5.3 3-7.5z"/>
-                        </svg>
-                        <select data-locale-select aria-label="{{ app()->getLocale() === 'ar' ? 'اللغة' : 'Langue' }}">
-                            <option value="fr">Français</option>
-                            <option value="ar">العربية</option>
-                        </select>
-                        <svg class="lang-select__chevron" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                            <path d="M5 8l5 5 5-5"/>
-                        </svg>
-                    </label>
+                <div class="staff-topbar__actions">
+                    <button class="button button--quiet" type="button" data-locale="fr">
+                        FR
+                    </button>
+
+                    <button class="button button--quiet" type="button" data-locale="ar">
+                        العربية
+                    </button>
+
+                    <span class="staff-user" aria-label="Current user">
+                        <b>◉</b>
+
+                        <span>
+                            {{ ucfirst($role ?? 'staff') }}
+                            <small>Serveur</small>
+                        </span>
+                    </span>
 
                     @yield('header_actions')
                 </div>
             </header>
 
-            <div class="alert" role="status" aria-live="polite" data-global-alert hidden></div>
+            <div
+                class="alert"
+                role="status"
+                aria-live="polite"
+                data-global-alert
+                hidden
+            ></div>
+
             @yield('content')
         </main>
     </div>

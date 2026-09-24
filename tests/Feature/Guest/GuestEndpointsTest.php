@@ -12,6 +12,7 @@ use App\Models\TableSession;
 use App\Models\User;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -30,7 +31,6 @@ class GuestEndpointsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-
 
         $this->seed(DatabaseSeeder::class);
 
@@ -84,38 +84,66 @@ class GuestEndpointsTest extends TestCase
             ->where('name', 'Café Noir (Espresso)')
             ->firstOrFail();
 
-        GuestAccess::where(
+        $accessIds = GuestAccess::where(
             'table_session_id',
             $this->session->id
-        )->delete();
+        )->pluck('id');
+
+        if ($accessIds->isNotEmpty()) {
+    DB::table('service_requests')
+        ->whereIn('guest_access_id', $accessIds)
+        ->delete();
+
+    $orderIds = DB::table('orders')
+        ->whereIn('guest_access_id', $accessIds)
+        ->pluck('id');
+
+    $orderItemIds = DB::table('order_items')
+        ->whereIn('order_id', $orderIds)
+        ->pluck('id');
+
+    DB::table('stock_movements')
+        ->whereIn('order_item_id', $orderItemIds)
+        ->delete();
+
+    DB::table('sale_adjustments')
+        ->whereIn('order_item_id', $orderItemIds)
+        ->delete();
+
+    DB::table('orders')
+        ->whereIn('guest_access_id', $accessIds)
+        ->delete();
+
+    GuestAccess::whereIn('id', $accessIds)->delete();
+}
     }
 
-   private function postJsonWithDeviceCookie(
-    string $url,
-    string $cookieValue,
-    array $data = []
-) {
-    return $this
-        ->withUnencryptedCookie(
-            ResolveGuestAccessFromCookie::COOKIE_NAME,
-            $cookieValue
-        )
-        ->withCredentials()
-        ->postJson($url, $data);
-}
+    private function postJsonWithDeviceCookie(
+        string $url,
+        string $cookieValue,
+        array $data = []
+    ) {
+        return $this
+            ->withUnencryptedCookie(
+                ResolveGuestAccessFromCookie::COOKIE_NAME,
+                $cookieValue
+            )
+            ->withCredentials()
+            ->postJson($url, $data);
+    }
 
-private function getJsonWithDeviceCookie(
-    string $url,
-    string $cookieValue
-) {
-    return $this
-        ->withUnencryptedCookie(
-            ResolveGuestAccessFromCookie::COOKIE_NAME,
-            $cookieValue
-        )
-        ->withCredentials()
-        ->getJson($url);
-}
+    private function getJsonWithDeviceCookie(
+        string $url,
+        string $cookieValue
+    ) {
+        return $this
+            ->withUnencryptedCookie(
+                ResolveGuestAccessFromCookie::COOKIE_NAME,
+                $cookieValue
+            )
+            ->withCredentials()
+            ->getJson($url);
+    }
 
     private function cookieValueFromResponse($response): string
     {

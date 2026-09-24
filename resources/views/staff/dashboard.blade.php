@@ -8,29 +8,33 @@
 @endpush
 
 @section('navigation')
-    <a href="{{ url('/staff') }}" data-staff-nav="access" aria-current="page" class="staff-nav__link">
-        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <circle cx="8" cy="6.5" r="2.75"/>
-            <path d="M2.5 16c.6-3 2.8-4.5 5.5-4.5s4.9 1.5 5.5 4.5"/>
-            <path d="M13 8.5l1.6 1.6L17.5 7"/>
-        </svg>
-        <span>{{ app()->getLocale() === 'ar' ? 'دخول الزبائن' : 'Accès invités' }}</span>
+    <a href="{{ url('/staff') }}"
+       data-staff-nav="access"
+       aria-current="page"
+       class="staff-nav__link">
+        <span>Accès invités</span>
+        <small>دخول الزبائن</small>
     </a>
-    <a href="{{ url('/staff') }}#orders" data-staff-nav="orders" class="staff-nav__link">
-        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 2.5h10v15l-2-1.3-2 1.3-2-1.3-2 1.3-2-1.3z"/>
-            <path d="M7.3 6.5h5.4M7.3 9.5h5.4M7.3 12.5h3.4"/>
-        </svg>
-        <span>{{ app()->getLocale() === 'ar' ? 'الطلبات' : 'Commandes' }}</span>
+
+    <a href="{{ url('/staff') }}#orders"
+       data-staff-nav="orders"
+       class="staff-nav__link">
+        <span>Commandes</span>
+        <small>الطلبات</small>
     </a>
-    <a href="{{ url('/staff') }}#tables" data-staff-nav="tables" class="staff-nav__link">
-        <svg width="19" height="19" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <rect x="2.5" y="2.5" width="6" height="6" rx="1.2"/>
-            <rect x="11.5" y="2.5" width="6" height="6" rx="1.2"/>
-            <rect x="2.5" y="11.5" width="6" height="6" rx="1.2"/>
-            <rect x="11.5" y="11.5" width="6" height="6" rx="1.2"/>
-        </svg>
-        <span>{{ app()->getLocale() === 'ar' ? 'الطاولات' : 'Tables' }}</span>
+
+    <a href="{{ url('/staff/service-requests') }}"
+       data-staff-nav="service-requests"
+       class="staff-nav__link">
+        <span>Demandes de service</span>
+        <small>طلبات الخدمة</small>
+    </a>
+
+    <a href="{{ url('/staff') }}#tables"
+       data-staff-nav="tables"
+       class="staff-nav__link">
+        <span>Tables</span>
+        <small>الطاولات</small>
     </a>
 @endsection
 

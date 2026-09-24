@@ -54,6 +54,21 @@
                     </div>
                     <div class="guest-product-grid" data-product-grid aria-live="polite"></div>
                 </section>
+            <section class="guest-service" aria-labelledby="service-title">
+                <p class="guest-service__eyebrow">Service à table / الخدمة للطاولة</p>
+                <h2 id="service-title">Besoin de nous ? / واش محتاجينا؟</h2>
+                <p class="muted">Ces actions deviennent disponibles après l’approbation de l’accès.</p>
+                <div class="guest-service__actions">
+                    <button class="button button--primary" type="button" data-service-request="waiter" disabled>
+                        Appeler le serveur / عيط للسيرفر
+                    </button>
+                    <button class="button" type="button" data-service-request="bill" disabled>
+                        Demander l’addition / طلب الحساب
+                    </button>
+                </div>
+                <div class="alert" role="status" aria-live="polite" data-service-request-result hidden></div>
+            </section>
+
             </section>
 
             <section class="guest-view" data-guest-view="cart" aria-labelledby="cart-title" hidden>

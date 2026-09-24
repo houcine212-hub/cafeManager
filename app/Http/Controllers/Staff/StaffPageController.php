@@ -37,6 +37,11 @@ class StaffPageController extends Controller
         return view('staff.orders', $this->pageContext($request));
     }
 
+    public function serviceRequests(Request $request)
+    {
+        return view('staff.service-requests', $this->pageContext($request));
+    }
+
     public function tables(Request $request)
     {
         $sessions = TableSession::query()

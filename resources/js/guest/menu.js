@@ -3,6 +3,7 @@ import { SubmissionAttempt } from '../core/idempotency.js';
 import { initGuestAccess } from './access.js';
 import { Cart, formatMadMinor } from './cart.js';
 import { submitGuestOrder } from './orders.js';
+import { submitServiceRequest } from './service-requests.js';
 
 function locale() {
     return document.documentElement.lang?.startsWith('ar') ? 'ar' : 'fr';
@@ -273,6 +274,17 @@ export async function initGuestMenu() {
         }
     };
 
+    const serviceButtons = [...root.querySelectorAll('[data-service-request]')];
+    const serviceResult = root.querySelector('[data-service-request-result]');
+    const activeServiceRequests = new Set();
+
+    const updateServiceState = () => {
+        serviceButtons.forEach(button => {
+            button.disabled = accessState !== 'approved'
+                || activeServiceRequests.has(button.dataset.serviceRequest);
+        });
+    };
+
     const updateSubmitState = () => {
         const hasUnavailable = cart.lines().some(line => line.unavailable);
         submitButton.disabled = cart.isEmpty() || accessState !== 'approved' || hasUnavailable;
@@ -463,6 +475,7 @@ export async function initGuestMenu() {
             renderApprovalArt(state);
             updateSubmitState();
             if (state === 'pending') setView('approval');
+            updateServiceState();
         },
         onMessage(message) {
             accessStatus.textContent = message;
@@ -484,6 +497,40 @@ export async function initGuestMenu() {
         } finally {
             if (accessState !== 'pending') accessButton.disabled = false;
         }
+    });
+
+    serviceButtons.forEach(button => {
+        button.addEventListener('click', async () => {
+            const type = button.dataset.serviceRequest;
+            button.disabled = true;
+
+            showMessage(
+                serviceResult,
+                'Envoi de la demande / جار إرسال الطلب',
+            );
+
+            try {
+                await submitServiceRequest(basePath, type);
+                activeServiceRequests.add(type);
+                showMessage(
+                    serviceResult,
+                    type === 'bill'
+                        ? 'Demande d’addition envoyée / تم إرسال طلب الحساب'
+                        : 'Le serveur arrive bientôt / النادل غادي يجي قريباً',
+                    'success',
+                );
+            } catch (error) {
+                showMessage(
+                    serviceResult,
+                    error.status === 403
+                        ? 'Accès approuvé requis / خاص الموافقة على الدخول'
+                        : 'La demande n’a pas pu être envoyée / تعذر إرسال الطلب',
+                    'error',
+                );
+            } finally {
+                updateServiceState();
+            }
+        });
     });
 
     submitButton.addEventListener('click', async () => {
@@ -518,5 +565,6 @@ export async function initGuestMenu() {
     root.querySelector('[data-menu-retry]')?.addEventListener('click', loadMenu);
     root.querySelector('[data-orders-retry]')?.addEventListener('click', loadOrders);
     renderCart();
+    updateServiceState();
     await loadMenu();
 }
