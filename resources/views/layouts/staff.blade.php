@@ -40,6 +40,10 @@
                     <span>Encaissement<small>الأداء</small></span>
                 </a>
                 @if (($role ?? 'staff') === 'manager')
+                    <a class="{{ request()->routeIs('staff.menu') ? 'is-active' : '' }}" href="{{ route('staff.menu') }}">
+                        <span class="nav-icon" aria-hidden="true">☷</span>
+                        <span>Menu et stock<small>القائمة والمخزون</small></span>
+                    </a>
                     <a class="{{ request()->routeIs('staff.team') ? 'is-active' : '' }}" href="{{ route('staff.team') }}">
                         <span class="nav-icon" aria-hidden="true">♙</span>
                         <span>Équipe<small>الفريق</small></span>

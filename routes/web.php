@@ -11,6 +11,7 @@ use App\Http\Controllers\Staff\TableSessionController;
 use App\Http\Controllers\Staff\GuestAccessController;
 use App\Http\Controllers\Staff\StaffPageController;
 use App\Http\Controllers\Staff\TeamController;
+use App\Http\Controllers\Staff\MenuController;
 use App\Http\Middleware\ResolveGuestAccessFromCookie;
 use App\Http\Middleware\ResolveTenantFromQrToken;
 use Illuminate\Support\Facades\Route;
@@ -117,6 +118,20 @@ Route::prefix('staff')
         Route::get('/service-requests', [StaffPageController::class, 'serviceRequests'])->name('staff.service-requests');
         Route::get('/tables', [StaffPageController::class, 'tables'])->name('staff.tables');
         Route::get('/payments', [StaffPageController::class, 'payments'])->name('staff.payments');
+        Route::get('/menu', [MenuController::class, 'index'])->name('staff.menu');
+
+        Route::post('/menu/categories', [MenuController::class, 'storeCategory'])
+            ->name('staff.menu.categories.store');
+
+        Route::patch('/menu/categories/{categoryId}', [MenuController::class, 'updateCategory'])
+            ->name('staff.menu.categories.update');
+
+        Route::post('/menu/products', [MenuController::class, 'storeProduct'])
+            ->name('staff.menu.products.store');
+
+        Route::patch('/menu/products/{productId}', [MenuController::class, 'updateProduct'])
+            ->name('staff.menu.products.update');
+
         Route::get('/team', [TeamController::class, 'index'])->name('staff.team');
 
         Route::post('/team', [TeamController::class, 'store'])->name('staff.team.store');
