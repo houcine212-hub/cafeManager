@@ -10,6 +10,7 @@ use App\Http\Controllers\Staff\ServiceRequestController;
 use App\Http\Controllers\Staff\TableSessionController;
 use App\Http\Controllers\Staff\GuestAccessController;
 use App\Http\Controllers\Staff\StaffPageController;
+use App\Http\Controllers\Staff\TeamController;
 use App\Http\Middleware\ResolveGuestAccessFromCookie;
 use App\Http\Middleware\ResolveTenantFromQrToken;
 use Illuminate\Support\Facades\Route;
@@ -116,6 +117,12 @@ Route::prefix('staff')
         Route::get('/service-requests', [StaffPageController::class, 'serviceRequests'])->name('staff.service-requests');
         Route::get('/tables', [StaffPageController::class, 'tables'])->name('staff.tables');
         Route::get('/payments', [StaffPageController::class, 'payments'])->name('staff.payments');
+        Route::get('/team', [TeamController::class, 'index'])->name('staff.team');
+
+        Route::post('/team', [TeamController::class, 'store'])->name('staff.team.store');
+
+        Route::patch('/team/{memberId}/status', [TeamController::class, 'updateStatus'])
+            ->name('staff.team.status');
 
         Route::get(
             '/guest-accesses',
