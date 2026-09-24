@@ -5,6 +5,7 @@
 @section('content')
     <section class="stack" style="max-width:30rem; margin-inline:auto">
         <div>
+            <p class="muted">Café Al Nour · Staff</p>
             <h1>Connexion / تسجيل الدخول</h1>
             <p class="muted">Accédez à la file de service et aux commandes.</p>
         </div>
@@ -35,5 +36,10 @@
 
             <button class="button button--primary" type="submit">Se connecter / دخول</button>
         </form>
+
+        <p class="muted">
+            Nouveau café ?
+            <a href="{{ route('register') }}">Créer votre espace / إنشاء فضاء جديد</a>
+        </p>
     </section>
 @endsection

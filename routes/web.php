@@ -3,6 +3,7 @@
 use App\Http\Controllers\Guest\GuestOrderController;
 use App\Http\Controllers\Guest\GuestPageController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\Staff\OrderController;
 use App\Http\Controllers\Staff\PaymentController;
 use App\Http\Controllers\Staff\ServiceRequestController;
@@ -20,11 +21,29 @@ Route::get('/', function () {
 Route::middleware('guest')->group(function () {
     Route::get('/login', [LoginController::class, 'create'])->name('login');
     Route::post('/login', [LoginController::class, 'store']);
+    Route::get('/register', [OnboardingController::class, 'createRegistration'])->name('register');
+    Route::post('/register', [OnboardingController::class, 'storeRegistration'])->name('register.store');
 });
 
 Route::post('/logout', [LoginController::class, 'destroy'])
     ->middleware('auth')
     ->name('logout');
+
+Route::prefix('onboarding')
+    ->middleware(['auth', 'tenant'])
+    ->group(function () {
+        Route::get('/', [OnboardingController::class, 'setup'])
+            ->name('onboarding.setup');
+
+        Route::post('/tables', [OnboardingController::class, 'storeTable'])
+            ->name('onboarding.tables.store');
+
+        Route::post('/categories', [OnboardingController::class, 'storeCategory'])
+            ->name('onboarding.categories.store');
+
+        Route::post('/products', [OnboardingController::class, 'storeProduct'])
+            ->name('onboarding.products.store');
+    });
 
 /*
 |--------------------------------------------------------------------------
